@@ -335,17 +335,20 @@
     fill: var(--clay);
   }
 
-  /* Scroll indicator */
+  /* Scroll indicator — bottom right, clear of hero meta */
   .scroll-indicator {
     position: absolute;
     bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
+    right: 48px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     animation: fade 1.2s ease 1.2s backwards;
+  }
+
+  @media (max-width: 1024px) {
+    .scroll-indicator { display: none; }
   }
 
   .scroll-line {
