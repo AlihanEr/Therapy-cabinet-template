@@ -1,27 +1,29 @@
+import Link from "next/link";
+
 export default function Nav() {
   return (
     <nav className="nav">
-      <a href="#" className="nav-brand">
+      <Link href="/" className="nav-brand">
         Cabinet<span className="dot"></span>Marien
-      </a>
+      </Link>
       <ul className="nav-links">
         <li>
-          <a href="#approche">Approche</a>
+          <a href="/#approche">Approche</a>
         </li>
         <li>
-          <a href="#soins">Soins</a>
+          <a href="/#soins">Soins</a>
         </li>
         <li>
-          <a href="#praticien">Praticien</a>
+          <a href="/#praticien">Praticien</a>
         </li>
         <li>
-          <a href="#principes">Principes</a>
+          <a href="/#principes">Principes</a>
         </li>
         <li>
-          <a href="#contact">Contact</a>
+          <a href="/#contact">Contact</a>
         </li>
       </ul>
-      <a href="#booking" className="nav-cta">
+      <Link href="/rendez-vous" className="nav-cta">
         Prendre rendez-vous
         <svg
           className="arrow"
@@ -36,7 +38,7 @@ export default function Nav() {
             strokeLinejoin="round"
           />
         </svg>
-      </a>
+      </Link>
     </nav>
   );
 }
