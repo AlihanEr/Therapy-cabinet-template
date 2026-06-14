@@ -2,9 +2,9 @@
 
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
-import { submitContact, type ContactState } from "@/app/actions";
+import { submitContact, type FormState } from "@/app/actions";
 
-const initialState: ContactState = { ok: false };
+const initialState: FormState = { ok: false };
 
 function SubmitButton() {
   const { pending } = useFormStatus();

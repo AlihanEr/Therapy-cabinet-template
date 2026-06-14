@@ -1,6 +1,5 @@
 import Approach from "@/components/Approach";
 import Booking from "@/components/Booking";
-import Calendly from "@/components/Calendly";
 import ClientEffects from "@/components/ClientEffects";
 import Contact from "@/components/Contact";
 import Footer from "@/components/Footer";
@@ -27,7 +26,6 @@ export default function Home() {
       <Contact />
       <Footer />
       <ClientEffects />
-      <Calendly />
     </>
   );
 }

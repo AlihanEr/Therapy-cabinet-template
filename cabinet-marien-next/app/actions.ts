@@ -1,6 +1,9 @@
 "use server";
 
-export type ContactState = {
+import { isValidSlot, MOTIFS, parseLocalDate, todayStr } from "@/lib/availability";
+import { sendMail } from "@/lib/email";
+
+export type FormState = {
   ok: boolean;
   error?: string;
   message?: string;
@@ -8,82 +11,136 @@ export type ContactState = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function recipient(): string {
+  return (
+    process.env.APPOINTMENT_TO_EMAIL ||
+    process.env.CONTACT_TO_EMAIL ||
+    process.env.GMAIL_USER ||
+    "contact@cabinet-marien.be"
+  );
+}
+
 export async function submitContact(
-  _prev: ContactState,
+  _prev: FormState,
   formData: FormData,
-): Promise<ContactState> {
+): Promise<FormState> {
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();
-  // Honeypot — bots fill hidden fields; humans never see it.
   const trap = String(formData.get("company") ?? "").trim();
 
   if (trap) return { ok: true, message: "Merci, votre message a bien été reçu." };
-
   if (!name || !email || !message) {
     return { ok: false, error: "Veuillez remplir le nom, l'e-mail et le message." };
   }
-  if (!EMAIL_RE.test(email)) {
-    return { ok: false, error: "Adresse e-mail invalide." };
-  }
+  if (!EMAIL_RE.test(email)) return { ok: false, error: "Adresse e-mail invalide." };
   if (message.length > 4000) {
     return { ok: false, error: "Message trop long (4000 caractères max)." };
   }
 
-  const to = process.env.CONTACT_TO_EMAIL || "contact@cabinet-marien.be";
-  const from =
-    process.env.CONTACT_FROM_EMAIL || "Cabinet Marien <onboarding@resend.dev>";
-  const apiKey = process.env.RESEND_API_KEY;
-
-  const subject = `Nouveau message du site — ${name}`;
-  const text =
-    `Nom : ${name}\n` +
-    `E-mail : ${email}\n` +
-    `Téléphone : ${phone || "—"}\n\n` +
-    `${message}\n`;
-
-  // No key configured yet — log server-side so the form is usable in dev.
-  if (!apiKey) {
-    console.info("[contact] RESEND_API_KEY not set; logging submission:\n" + text);
+  try {
+    await sendMail({
+      to: recipient(),
+      replyTo: email,
+      subject: `Nouveau message du site — ${name}`,
+      text:
+        `Nom : ${name}\nE-mail : ${email}\nTéléphone : ${phone || "—"}\n\n${message}\n`,
+    });
     return {
       ok: true,
       message: "Message reçu. Nous vous répondrons dans les plus brefs délais.",
     };
+  } catch (err) {
+    console.error("[contact] send failed", err);
+    return {
+      ok: false,
+      error: "Envoi impossible pour le moment. Réessayez ou téléphonez-nous.",
+    };
+  }
+}
+
+export async function submitAppointment(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const date = String(formData.get("date") ?? "").trim();
+  const slot = String(formData.get("slot") ?? "").trim();
+  const motif = String(formData.get("motif") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+  const trap = String(formData.get("company") ?? "").trim();
+
+  if (trap) return { ok: true, message: "Votre demande a bien été reçue." };
+
+  if (!name || !email || !phone || !date || !slot || !motif) {
+    return { ok: false, error: "Veuillez remplir tous les champs obligatoires." };
+  }
+  if (!EMAIL_RE.test(email)) return { ok: false, error: "Adresse e-mail invalide." };
+  if (!(MOTIFS as readonly string[]).includes(motif)) {
+    return { ok: false, error: "Motif invalide." };
+  }
+  if (date < todayStr()) {
+    return { ok: false, error: "La date choisie est déjà passée." };
+  }
+  if (!isValidSlot(date, slot)) {
+    return {
+      ok: false,
+      error: "Ce créneau n'est plus disponible. Choisissez un autre horaire.",
+    };
+  }
+  if (note.length > 2000) {
+    return { ok: false, error: "Message trop long (2000 caractères max)." };
   }
 
+  const human = parseLocalDate(date)?.toLocaleDateString("fr-BE", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const when = `${human} à ${slot}`;
+
   try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from,
-        to: [to],
-        reply_to: email,
-        subject,
-        text,
-      }),
+    // Notify the cabinet.
+    await sendMail({
+      to: recipient(),
+      replyTo: email,
+      subject: `Demande de rendez-vous — ${name} (${date} ${slot})`,
+      text:
+        `Nouvelle demande de rendez-vous :\n\n` +
+        `Quand : ${when}\nMotif : ${motif}\n\n` +
+        `Nom : ${name}\nE-mail : ${email}\nTéléphone : ${phone}\n\n` +
+        `Note du patient :\n${note || "—"}\n`,
     });
 
-    if (!res.ok) {
-      const detail = await res.text();
-      console.error("[contact] Resend error", res.status, detail);
-      return {
-        ok: false,
-        error:
-          "Envoi impossible pour le moment. Réessayez ou téléphonez-nous au +32 2 511 04 22.",
-      };
-    }
+    // Confirm to the patient.
+    await sendMail({
+      to: email,
+      replyTo: recipient(),
+      subject: `Votre demande de rendez-vous — Cabinet Marien`,
+      text:
+        `Bonjour ${name},\n\n` +
+        `Nous avons bien reçu votre demande de rendez-vous :\n\n` +
+        `  ${when}\n  Motif : ${motif}\n\n` +
+        `Le cabinet vous recontacte rapidement pour confirmer ce créneau. ` +
+        `En cas d'empêchement, répondez simplement à cet e-mail ou appelez le +32 2 511 04 22.\n\n` +
+        `À bientôt,\nCabinet Marien — Kinésithérapie & Thérapie Manuelle\n` +
+        `Rue de la Forêt 12, 1050 Ixelles\n`,
+    });
 
     return {
       ok: true,
-      message: "Message envoyé. Nous vous répondrons dans les plus brefs délais.",
+      message: `Demande envoyée pour ${when}. Un e-mail de confirmation vient de vous être adressé.`,
     };
   } catch (err) {
-    console.error("[contact] request failed", err);
-    return { ok: false, error: "Erreur réseau. Veuillez réessayer plus tard." };
+    console.error("[appointment] send failed", err);
+    return {
+      ok: false,
+      error:
+        "Envoi impossible pour le moment. Réessayez ou téléphonez-nous au +32 2 511 04 22.",
+    };
   }
 }
