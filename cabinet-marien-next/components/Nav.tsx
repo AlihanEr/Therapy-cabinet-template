@@ -21,7 +21,7 @@ export default function Nav() {
           <a href="#contact">Contact</a>
         </li>
       </ul>
-      <a href="#booking" className="nav-cta">
+      <a href="#booking" data-calendly className="nav-cta">
         Prendre rendez-vous
         <svg
           className="arrow"

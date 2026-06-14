@@ -6,7 +6,11 @@ export default function Booking() {
           Prêt·e à commencer ? <em>Réservons</em> votre première séance.
         </h2>
         <div className="booking-actions">
-          <a href="#" className="booking-btn">
+          <a
+            href="https://calendly.com/cabinet-marien/seance"
+            data-calendly
+            className="booking-btn"
+          >
             Prendre rendez-vous en ligne
             <svg
               className="arrow"
